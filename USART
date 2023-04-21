@@ -1,0 +1,110 @@
+#include "main.h"
+#include <stdio.h>
+#include "stm32f4xx.h"
+#include "stm32f4xx_gpio.h"
+#include "stm32f4xx_rcc.h"
+#include "stm32f4xx_usart.h"
+
+
+
+#define  BAUD_115200  115200
+
+void rcc_cfg(){
+  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE); /// Cấp clock cho GPIOA
+  RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE); /// Cấp clock cho USART2
+}
+
+void gpio_cfg(){
+  GPIO_PinAFConfig(GPIOA,GPIO_PinSource2,GPIO_AF_USART2);
+  GPIO_PinAFConfig(GPIOA,GPIO_PinSource3,GPIO_AF_USART2);
+  ///chân PA2 và PA3 sử dụng cho USART2.
+  
+  GPIO_InitTypeDef GPIO_struct;
+  GPIO_struct.GPIO_Pin = GPIO_Pin_2 | GPIO_Pin_3;
+  GPIO_struct.GPIO_Mode = GPIO_Mode_AF;
+  GPIO_struct.GPIO_PuPd = GPIO_PuPd_NOPULL;
+  GPIO_struct.GPIO_Speed = GPIO_Speed_50MHz;
+  
+
+  GPIO_Init(GPIOA,&GPIO_struct);
+}
+
+void usart_cfg(){
+  USART_InitTypeDef USART_struct;
+//  USART_struct.USART_BaudRate = BAUD_115200; 
+  USART_struct.USART_BaudRate = BAUD_1M; 
+  USART_struct.USART_Mode = USART_Mode_Tx | USART_Mode_Rx; 
+  USART_struct.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+  USART_struct.USART_Parity = USART_Parity_No; 
+  USART_struct.USART_StopBits = USART_StopBits_1; /// 1 bit dừng
+  USART_struct.USART_WordLength = USART_WordLength_8b; /// chế độ khung dữ liệu 8 bit
+  USART_Init(USART2,&USART_struct);
+
+//  USART_ClearFlag(USART2, USART_FLAG_RXNE);  /// xóa cờ lần đầu
+//  USART_ITConfig(USART2,USART_IT_RXNE,ENABLE); /// cho phép ngắt cờ RXNE khi thanh ghi đệm RX không rỗng
+//  NVIC_EnableIRQ(USART2_IRQn);
+
+  USART_Cmd(USART2,ENABLE);
+}
+
+void delay_ms(int time) ///hàm delay dùng SysTick
+{
+    while(time)
+    {
+      SysTick -> LOAD = 100000 - 1;
+      SysTick -> VAL  = 0;
+      SysTick -> CTRL = 5;
+      while(!(SysTick -> CTRL & ( 1 << 16)));
+      --time;
+    }
+}
+
+void send_char(uint8_t c){ /// Hàm gửi một kí tự ra COM
+//  USART_ClearFlag(USART2,USART_FLAG_TXE);
+  USART_SendData(USART2,c);
+  while(USART_GetFlagStatus(USART2,USART_FLAG_TXE) == RESET); /// chờ đến khi cờ TXE được set -> đã chuyển xong một frame
+}
+
+void printf_string(uint8_t *str){ /// hàm đưa một xâu kí tự ra COM
+  while((*(str)) != NULL){
+    send_char(*(str++));
+  }
+  while (USART_GetFlagStatus(USART2,USART_FLAG_TC)==RESET); /// Chờ đến khi cờ TC được set -> kết thúc quá trình truyền
+}
+
+char convert_int_to_char(uint8_t n){ /// hàm chuyển đổi số ra kiểu char
+   return n+48;
+}
+
+void printf_num(int32_t num){ /// hàm đưa một số ra COM
+  if(num < 0){
+    send_char("-");
+  }
+  uint8_t rev_num[20];
+  int i = 0;
+  while(num != 0 ){
+    rev_num[i++] = num%10;
+    num/=10;
+  }
+  i--;
+  for(i;i>=0;i--){
+    send_char(convert_int_to_char(rev_num[i]));
+  }
+  while (USART_GetFlagStatus(USART2,USART_FLAG_TC)==RESET);
+}
+
+
+int main(void)
+{
+  rcc_cfg();
+  gpio_cfg();
+  usart_cfg();
+
+  while(1){
+    printf_string("hello_world\n"); /// in "hello world" ra cổng COM
+    printf_string("\n");
+    delay_ms(100); /// tạo trễ 100ms để in tiếp.
+  }
+}
+
+/
