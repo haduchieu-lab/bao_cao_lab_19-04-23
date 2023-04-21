@@ -130,7 +130,8 @@ int main(void)
   usart_cfg();
 
   while(1){
-    printf_string("hello_world\n"); /// in "hello world" ra cổng COM
+    printf_string("hmvkxdghzgkok;\n"); /// in "hello world" ra cổng COM
+    printf_string("10032340");
     printf_string("\n");
     delay_ms(100); /// tạo trễ 100ms để in tiếp.
   }
